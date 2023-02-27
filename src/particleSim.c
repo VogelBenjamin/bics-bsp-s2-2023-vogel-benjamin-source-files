@@ -1,16 +1,9 @@
 #include<stdlib.h>
 #include<stdio.h>
+#include"linearAlgebra.h"
 
-int vectorSize = 3;
-
-double* createVector();
-void setVector(double* vector);
-void printVector(double* vector);
-double* vectorAddition(double *vector1, double *vector2);
-double dotProduct(double *vector1, double *vector2);
-double* crossProduct(double *vector1, double *vector2);
-
-struct Particle {
+/*
+struct particle {
   double* position;
   double* velocity;
   double* acceleration;
@@ -19,11 +12,35 @@ struct Particle {
   double Hamaker_coef;
 };
 
+struct electricField {
+  int energy;
+};
+
+struct magneticField {
+  int energy;
+};
+
+
+void run(double **allParticles);
+void move(struct particle particle);
+*/
+
 int main(){
   double **arrayVector;
   double *vector1, *vector2;
   int numberOfVectors;
+  /*
+  struct particle proton;
+  proton.position = createVector();
+  proton.position[0] = 0;
+  proton.position[1] = 0;
+  proton.position[2] = 0;
+  proton.velocity = createVector();
+  proton.velocity[0] = 0;
+  proton.velocity[1] = 0;
+  proton.velocity[2] = 0;
 
+  */
   printf("Please input the number of vectors: ");
   scanf("%d",&numberOfVectors);
 
@@ -41,52 +58,9 @@ int main(){
 
   return 0;
 }
-
-
-double* createVector(){
-  double* newVector = (double*)malloc(vectorSize*sizeof(newVector));
-  return newVector;
+/*
+void move(struct particle particle){
+  particle.velocity = vectorAddition(particle.velocity,particle.acceleration);
+  particle.position = vectorAddition(particle.position,particle.velocity);
 }
-
-void setVector(double *vector){
-  printf("Please input the vector values (x,y,z): ");
-  for (int i = 0; i < vectorSize; ++i)
-  {
-    scanf("%lf",vector+i);
-  }
-}
-
-void printVector(double *vector){
-  printf("(");
-  for (int i = 0; i < vectorSize; ++i)
-  {
-    printf("%lf,", vector[i] );
-  }
-  printf(")\n");
-}
-
-double* vectorAddition(double *vector1, double *vector2){
-  double* addedVector = (double*)malloc(vectorSize*sizeof(addedVector));
-  for (int i = 0; i < vectorSize; ++i)
-  {
-    addedVector[i] = vector1[i]+vector2[i];
-  }
-  return addedVector;
-}
-
-double dotProduct(double *vector1, double *vector2){
-  double dP = 0;
-  for (int i = 0; i < vectorSize; ++i)
-  {
-    dP += vector1[i]*vector2[i];
-  }
-  return dP;
-}
-
-double* crossProduct(double *vector1, double *vector2){
-  double *cP = (double*)malloc(vectorSize*sizeof(cP));
-  cP[0] = vector1[1]*vector2[2]-vector2[1]*vector1[2];
-  cP[1] = -vector1[0]*vector2[2]+vector2[0]*vector1[2];
-  cP[2] = vector1[0]*vector2[1]-vector2[0]*vector1[1];;
-  return cP;
-}
+*/

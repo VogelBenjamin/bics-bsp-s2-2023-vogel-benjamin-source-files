@@ -1,0 +1,5 @@
+particleID: 1
+mass: 1
+charge: 1
+radius: 1
+epsilon: 1

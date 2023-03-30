@@ -114,8 +114,8 @@ int main(){
   free(vel);
   free(acc);
 
-  //#pragma omp parallel shared(particleArraySize,particleArray,elFi,magFi)
-    //#pragma omp for schedule(static,200) private(i,j)
+  #pragma omp parallel shared(particleArraySize,particleArray,elFi,magFi)
+    #pragma omp for schedule(static,200) private(i,j)
       for (i = 0; i < particleArraySize; ++i)
       {
         for (j = 1; j < 1001; ++j)

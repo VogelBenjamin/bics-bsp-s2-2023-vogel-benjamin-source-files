@@ -15,3 +15,5 @@ double dotProduct(double *vector1, double *vector2);
 void crossProduct(double *vector1, double *vector2,double* cP);
 void normalize(double *vector);
 double angleBetween(double *v1, double * v2);
+double solve(double *equation, int eqSize);
+double *getLinearDerivative(double *equation, int eqSize);

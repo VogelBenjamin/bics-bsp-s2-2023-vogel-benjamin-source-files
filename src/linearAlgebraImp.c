@@ -138,3 +138,31 @@ void normalize(double *vector){
 double angleBetween(double *v1, double * v2){
   return acos((dotProduct(v1,v2))/(norm(v1)*norm(v2)));
 }
+
+/*
+  searches for unique solution of an equation
+  assuming equation is linear
+*/
+double *solveAugMatrix(double **augMatrix, int numEq, int numVar){
+  double ratio;
+  double *solution = (double*)malloc(sizeof(solution)*numVar);
+  // transform matrix into row echelon form
+  for (int i = 0; i < numVar; ++i)
+  {
+    for (int j = i+1; j < numEq-i-1; ++j)
+    {
+      ratio = augMatrix[i][j]/augMatrix[i][i];
+      for (int k = 0; k < numVar+1; ++i)
+      {
+        augMatrix[k][j] -= ratio*augMatrix[k][i];
+      }
+    }
+  }
+
+  for (int i = 0; i < numVar; ++i)
+  {
+    solution[i] = augMatrix[i][i];
+  }
+
+  return solution;
+}

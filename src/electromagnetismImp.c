@@ -219,20 +219,25 @@ void applyAcceleration(struct particle *p, struct electricField *eF, struct magn
 }
 
 /*
-  checks wheter two particles collide
+  checks a priori wheter two particles collide
 */
 void checkCollision(struct particle *p1, struct particle *p2){
-  double colRadius = p1->attributes->radius + p2->attributes->radius;
-  double* direct = connectPoints(p1->position,p2->position);
-  double distance = norm(direct);
-  if (distance > colRadius)
-  {
+  double colRadius;
+  double augementedMatrix[3][3];
 
-  }
-  else{
+  // determine at what distance (center-center) the particles are considered as colliding
+  colRadius = p1->attributes->radius + p2->attributes->radius;
 
-  }
-  free(direct);
+  // the instantaneous velecoity corresponds to the coefficients of the respective displacement equations
+  modifyVector(augementedMatrix[0], p1->velocity);
+
+  modifyVector(augementedMatrix[1], p2->velocity);
+  scalarMultiplication(-1, augementedMatrix[1]);
+
+  modifyVector(augementedMatrix[2], p2->position);
+  vectorSubtraction(augementedMatrix[2], p1->position);
+
+
 }
 
 /*
@@ -310,3 +315,4 @@ double *electroStaticForce(struct particle *p1, struct particle *p2){
 
   return direct;
 }
+

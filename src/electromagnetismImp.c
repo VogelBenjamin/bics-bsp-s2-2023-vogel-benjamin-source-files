@@ -1,12 +1,25 @@
 #include<stdlib.h>
 #include<stdio.h>
+#include<stdbool.h>
 #include<math.h>
 #include"electromagnetism.h"
 #include"linearAlgebra.h"
+#include "testing.h"
 #include "omp.h"
 
 int vecSize = 3;
-const double K = 8.987551792E9;
+double timeStep = 0.001;
+double electroKonst = 8.987551792E9;
+double chargeToCoulombsRatio = 1.6022E-19;
+double uToKgRatio = 1.66054E-27;
+
+double getStep(){
+  return timeStep;
+}
+
+void setStep(double val){
+  timeStep = val;
+}
 
 /*
   allocate memory for a particle struct
@@ -62,7 +75,7 @@ void freeArrayOfParticles(struct particle **particleArray, int arraySize){
 */
 struct electricField *createElectricField(){
   struct electricField *eF = (struct electricField*)malloc(sizeof(eF));
-  eF->fieldVector = (double*)malloc(sizeof(eF->fieldVector));
+  eF->fieldVector = (double*)malloc(sizeof(eF->fieldVector)*vecSize);
 }
 
 /*
@@ -70,14 +83,14 @@ struct electricField *createElectricField(){
 */
 struct magneticField *createMagneticField(){
   struct magneticField *mF = (struct magneticField*)malloc(sizeof(mF));
-  mF->fieldVector = (double*)malloc(sizeof(mF->fieldVector));
+  mF->fieldVector = (double*)malloc(sizeof(mF->fieldVector)*vecSize);
 }
 
 /*
   reads file containg information on a particle and returns an array containing all important values
 */
 double *getParticleAttributes(FILE *particleDoc){
-  double *attr = (double*)malloc(4*sizeof(double));
+  double *attr = (double*)malloc(5*sizeof(double));
   char output[15];
   char *ptr;
 
@@ -102,6 +115,11 @@ double *getParticleAttributes(FILE *particleDoc){
   fgets(output, 5, particleDoc);
   attr[3] = strtod(output,&ptr);
 
+  // Extract the sigma from the file
+  fgets(output, 8, particleDoc);
+  fgets(output, 5, particleDoc);
+  attr[4] = strtod(output,&ptr);
+
   return attr;
 }
 
@@ -119,6 +137,7 @@ void setParticleInfo(struct particle *p, double *pos, double *vel, double *acc, 
   p->attributes->charge = attr[1];
   p->attributes->radius = attr[2];
   p->attributes->epsilon = attr[3];
+  p->attributes->sigma = attr[4];
 
 }
 
@@ -181,18 +200,21 @@ void move(struct particle *particle,double timeStep){
   double posAcc[3];
 
 
-  // calculation of the progression in velocity
+  // calculation of the change in velocity
   modifyVector(velProg, particle->acceleration);
   scalarMultiplication(timeStep,velProg);
 
-  // calculation of the progression in position
+  // calculation of the change in position
+
+  // vΔt
   modifyVector(posProg, particle->velocity);
   modifyVector(posAcc, particle->acceleration);
 
+  // (aΔt^2)/2
   scalarMultiplication(timeStep,posProg);
   scalarMultiplication(0.5*pow(timeStep,2),posAcc);
 
-  // adding the position and velocity progression to their respective fields
+  // adding the position and velocity variation to their respective fields
   vectorAddition(particle->position,posProg);
   vectorAddition(particle->position,posAcc);
 
@@ -202,73 +224,300 @@ void move(struct particle *particle,double timeStep){
 /*
   applies the acceleration cause from electric and magnetic fields
 */
-void applyAcceleration(struct particle *p, struct electricField *eF, struct magneticField *mF){
+void applyFieldAcceleration(struct particle *p, struct electricField *eF, struct magneticField *mF){
   double chargeMassRatio = p->attributes->charge/p->attributes->mass;
-  double force;
-  double crossP[3];
-  crossProduct(p->velocity,mF->fieldVector,crossP);
+  double *force = (double*)calloc(vecSize,sizeof(force));
+  double *eFo, *mFo;
 
   // for the 3 directions the acceleration force of both fields are calculated and added to the acceleration of the particle
-  for (int i = 0; i < vecSize; ++i)
+
+  eFo = electricForce(p, eF);
+  mFo = magneticForce(p, mF);
+
+  vectorAddition(force, eFo);
+  vectorAddition(force, mFo);
+
+  modifyVector(p->acceleration, force);
+
+  free(eFo);
+  free(mFo);
+  free(force);
+}
+
+void applyInterAcceleration(struct particle *p1, struct particle *p2){
+  double *force = (double*)calloc(vecSize,sizeof(force));
+  double *temp = (double*)calloc(vecSize,sizeof(force));
+  double *ljFo, *elstFo;
+
+  // apply electrostatic force
+  if (p1->attributes->charge != 0 && p2->attributes->charge != 0)
   {
-    force = 0;
-    force += chargeMassRatio*eF->fieldVector[i];
-    force += chargeMassRatio*crossP[i];
-    p->acceleration[i] = force;
+    elstFo = electroStaticForce(p1,p2);
+    modifyVector(temp, elstFo);
+
+    // p2
+    scalarMultiplication(1/uToKg(p2->attributes->mass),elstFo);
+    vectorAddition(p2->acceleration, elstFo);
+
+    // p1
+    scalarMultiplication(-1/uToKg(p1->attributes->mass), temp);
+    vectorAddition(p1->acceleration, temp);
+    free(elstFo);
   }
+  else {
+    // apply lennard-jones force
+    ljFo = lennardJonesPotentialForce(p1, p2);
+    modifyVector(temp, ljFo);
+
+    // p2
+    scalarMultiplication(1/uToKg(p2->attributes->mass), ljFo);
+    vectorAddition(p2->acceleration, ljFo);
+
+    // p1
+    scalarMultiplication(-1/uToKg(p1->attributes->mass), temp);
+    vectorAddition(p1->acceleration, temp);
+    free(ljFo);
+  }
+
+  free(temp);
+  free(force);
+}
+
+double *electricForce(struct particle *p, struct electricField *eF){
+  double chargeMassRatio = chargeToCoulombs(p->attributes->charge)/uToKg(p->attributes->mass);
+  double *elForce = (double*)calloc(vecSize,sizeof(elForce));
+
+  modifyVector(elForce, eF->fieldVector);
+  scalarMultiplication(chargeMassRatio,elForce);
+
+  scalarMultiplication(nanoToMeter(1),elForce);
+
+  return elForce;
+}
+
+double *magneticForce(struct particle *p, struct magneticField *mF){
+  double chargeMassRatio = chargeToCoulombs(p->attributes->charge)/uToKg(p->attributes->mass);
+  double *magForce = (double*)calloc(vecSize,sizeof(magForce));
+  double crossP[3];
+  crossProduct(p->velocity,mF->fieldVector,crossP);
+  modifyVector(magForce,crossP);
+  scalarMultiplication(chargeMassRatio,magForce);
+  scalarMultiplication(nanoToMeter(1),magForce);
+
+  return magForce;
 }
 
 /*
   checks a priori wheter two particles collide
 */
-void checkCollision(struct particle *p1, struct particle *p2){
-  double colRadius;
-  double augementedMatrix[3][3];
+double checkPrioriCollision(struct particle *p1, struct particle *p2){
+  double colRadius = 1E-12*(p1->attributes->radius + p2->attributes->radius);
 
-  // determine at what distance (center-center) the particles are considered as colliding
+  /*
+  double *relativePos = (double*)malloc(sizeof(double)*3);
+  double *relativeVel = (double*)malloc(sizeof(double)*3);
+
+  double distance, positionDeterm, velIntensity, discriminant, ratio;
+
+
+  modifyVector(relativePos, p1->position);
+  vectorSubtraction(relativePos, p2->position);
+
+  modifyVector(relativeVel, p1->velocity);
+  vectorSubtraction(relativeVel, p2->velocity);
+
   colRadius = p1->attributes->radius + p2->attributes->radius;
 
-  // the instantaneous velecoity corresponds to the coefficients of the respective displacement equations
-  modifyVector(augementedMatrix[0], p1->velocity);
+  distance = dotProduct(relativePos, relativePos);
 
-  modifyVector(augementedMatrix[1], p2->velocity);
-  scalarMultiplication(-1, augementedMatrix[1]);
+  positionDeterm = dotProduct(relativeVel, relativePos);
 
-  modifyVector(augementedMatrix[2], p2->position);
-  vectorSubtraction(augementedMatrix[2], p1->position);
+  if (positionDeterm >= 0.0)
+  {
+    return NAN;
+  }
 
+  velIntensity = dotProduct(relativeVel, relativeVel);
 
+  discriminant = pow(positionDeterm,2) - velIntensity*distance;
+
+  if (discriminant < 0)
+  {
+    return NAN;
+  }
+
+  ratio = (-positionDeterm-sqrt(discriminant))/velIntensity;
+  */
+
+  if (nanoToMeter(distance(p1->position,p2->position)) < colRadius)
+  {
+    return 0;
+  }
+
+  double **augementedMatrix = (double**)malloc(sizeof(double*)*3);
+  double *c1 = (double*)malloc(sizeof(double)*3);
+  double *c2 = (double*)malloc(sizeof(double)*3);
+  double *c3 = (double*)malloc(sizeof(double)*3);
+  double *solution;
+  double ratio;
+
+  /*
+  double *directionVec = connectPoints(p1->position, p2->position);
+  normalize(directionVec);
+  scalarMultiplication(p1->attributes->radius+p1->attributes->radius,directionVec);
+  */
+  // create augemented matrix corresponding to linear system composed of the instantaneous tragectory of two particles
+  modifyVector(c1, p1->velocity);
+  scalarMultiplication(timeStep, c1);
+
+  modifyVector(c2, p2->velocity);
+  scalarMultiplication(-timeStep, c2);
+
+  modifyVector(c3, p2->position);
+  vectorSubtraction(c3, p1->position);
+  //vectorSubtraction(c3, directionVec);
+
+  //free(directionVec);
+
+  augementedMatrix[0] = c1;
+  augementedMatrix[1] = c2;
+  augementedMatrix[2] = c3;
+
+  // solve the system to determine, whether the trajectory intersect
+
+  solution = solveAugMatrix(augementedMatrix,3,2);
+
+  if (solution[0] < 0 || solution[1] < 0 || (solution[0] == 0 && solution[1] == 0 && !compareArray(p1->position,p2->position,3)))
+  {
+    ratio = NAN;
+    freeMatrix(augementedMatrix,3);
+    free(solution);
+
+    return ratio;
+  }
+
+  if (solution[1] == 0)
+  {
+    solution[0] = augementedMatrix[2][0]/(augementedMatrix[0][0]+augementedMatrix[1][0]);
+    solution[1] = augementedMatrix[2][0]/(augementedMatrix[0][0]+augementedMatrix[1][0]);
+    ratio = evaluateCollision(solution);
+    freeMatrix(augementedMatrix,3);
+    return ratio;
+  }
+
+  ratio = evaluateCollision(solution);
+  freeMatrix(augementedMatrix,3);
+
+  return ratio;
+}
+
+double evaluateCollision(double *sol){
+  double distance = 0;
+  if (!checkIfAllNAN(sol,2) && isWithIn(sol[0],0,1) && isWithIn(sol[1],0,1) && abs(sol[0]-sol[1] < 0.001))
+  {
+    distance = sol[0];
+    free(sol);
+    return distance;
+  }
+  free(sol);
+  return NAN;
 }
 
 /*
   calculates the forces caused by a collision and applies them on the respective particles
 */
-void calcCollision(struct particle *p1, struct particle *p2){
+void calcCollision(struct particle *p1, struct particle *p2, double *direct){
 
-  double relativeSpeed[3];
-  double normalSpeed[3];
-  double *direct;
+  double vCenter1[3];
+  double vCenter2[3];
+  double vNormal1[3];
+  double vNormal2[3];
 
-  // vector between the two centers of the particles
-  direct = connectPoints(p1->position,p2->position);
+  if (abs(norm(p1->velocity) < 1E-10) || abs(norm(p2->velocity)) < 1E-10)
+  {
+    double relativeSpeed[3];
+    double normalSpeed[3];
 
-  normalize(direct);
+    // calculate the relative velocity
+    modifyVector(relativeSpeed,p1->velocity);
+    vectorSubtraction(relativeSpeed,p2->velocity);
 
-  // calculate the relative velocity
-  modifyVector(relativeSpeed,p1->velocity);
-  vectorSubtraction(relativeSpeed,p2->velocity);
+    // calculate the velocity in the direction of 'direct'
+    modifyVector(normalSpeed,direct);
+    scalarMultiplication(dotProduct(relativeSpeed,direct),normalSpeed);
 
-  // calculate the velocity in the direction of 'direct'
-  modifyVector(normalSpeed,direct);
-  scalarMultiplication(dotProduct(relativeSpeed,direct),normalSpeed);
 
-  // the respective normal (direct) forces are applied on the other particle
-  vectorAddition(p2->velocity,normalSpeed);
-  scalarMultiplication(-1,normalSpeed);
-  vectorAddition(p1->velocity,normalSpeed);
+    // the respective normal (direct) forces are applied on the other particle
+    vectorAddition(p2->velocity,normalSpeed);
+    scalarMultiplication(-1,normalSpeed);
+    vectorAddition(p1->velocity,normalSpeed);
+  } else{
+    double angle1 = angleBetween(direct, p1->velocity);
+    scalarMultiplication(-1,direct);
+    double angle2 = angleBetween(direct, p2->velocity);
+
+    modifyVector(vCenter1,p1->velocity);
+    scalarMultiplication(cos(angle1),vCenter1);
+
+    modifyVector(vCenter2,p2->velocity);
+    scalarMultiplication(cos(angle2),vCenter2);
+
+    modifyVector(vNormal1, p1->velocity);
+    vectorSubtraction(vNormal1, vCenter1);
+
+    modifyVector(vNormal2, p2->velocity);
+    vectorSubtraction(vNormal2, vCenter2);
+
+    modifyVector(p1->velocity, vCenter2);
+    modifyVector(p2->velocity, vCenter1);
+
+    vectorSubtraction(p1->velocity, vNormal1);
+    vectorSubtraction(p2->velocity, vNormal2);
+  }
 
   free(direct);
+
 }
+
+/*
+  executes necessary functions for the checking of collisions
+*/
+bool handleCollision(struct particle *p1, struct particle *p2){
+  double eval = checkPrioriCollision(p1,p2);
+  double *direct;
+  double a[3],b[3],c[3],d[3];
+  if (!isnan(eval))
+  {
+    if (eval)
+    {
+      move(p1,eval*timeStep);
+      move(p2,eval*timeStep);
+    }
+
+    modifyVector(a,p1->position);
+    modifyVector(b,p2->position);
+
+    modifyVector(c,p1->velocity);
+    modifyVector(d,p2->velocity);
+
+    scalarMultiplication(0.001,c);
+    scalarMultiplication(0.001,d);
+
+    vectorSubtraction(a,c);
+    vectorSubtraction(b,d);
+
+    // vector between the two centers of the particles
+    direct = connectPoints(a,b);
+    normalize(direct);
+
+    calcCollision(p1, p2, direct);
+    move(p1,(1-eval)*timeStep);
+    move(p2,(1-eval)*timeStep);
+    return 1;
+  }
+  return 0;
+}
+
 /*
   approximates the van der waals force between two particles
 */
@@ -282,9 +531,12 @@ double *lennardJonesPotentialForce(struct particle *p1, struct particle *p2){
   // get distance between the two particles
   direct = connectPoints(p1->position,p2->position);
   distance = norm(direct);
+  distance = meterToAngstrom(distance);
+  normalize(direct);
+
 
   // determine sigma
-  sigma = 0.5*(p1->attributes->radius + p2->attributes->radius);
+  sigma = 0.5*(p1->attributes->sigma + p2->attributes->sigma);
 
   // determine depth of potential well
   epsilon = pow((p1->attributes->epsilon * p1->attributes->epsilon),0.5);
@@ -304,15 +556,32 @@ double *electroStaticForce(struct particle *p1, struct particle *p2){
 
   // determine direction of the force
   direct = connectPoints(p1->position,p2->position);
-
   // calculates the intensity of the Force
-  eSForce = K*(p1->attributes->charge)*(p2->attributes->charge)/pow(norm(direct),2);
-
+  eSForce = electroKonst*(chargeToCoulombs(p1->attributes->charge))*(chargeToCoulombs(p2->attributes->charge))/pow(norm(direct),2);
+  //printf("ELST FORCE: %lf\n",eSForce);
   // normalizes the direction vector and multiplies magnitude of Force to it
   normalize(direct);
+  //printVector(direct);
+  //printf("FORCE: %lf\n", eSForce);
 
   scalarMultiplication(eSForce,direct);
 
   return direct;
+}
+
+double chargeToCoulombs(double charge){
+  return chargeToCoulombsRatio*charge;
+}
+
+double nanoToMeter(double value){
+  return value*1E-9;
+}
+
+double uToKg(double weight){
+  return uToKgRatio*weight;
+}
+
+double meterToAngstrom(double distance){
+  return 1E10*distance;
 }
 

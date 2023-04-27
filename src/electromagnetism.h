@@ -1,13 +1,16 @@
 #include<stdlib.h>
 #include<stdio.h>
 #include<math.h>
+#include <stdbool.h>
 #include "omp.h"
+
 
 struct particleInfo {
   double mass;
   double charge;
   double radius;
   double epsilon;
+  double sigma;
 };
 
 struct particle {
@@ -25,6 +28,8 @@ struct magneticField {
   double *fieldVector;
 };
 
+double getStep();
+void setStep(double val);
 struct particle *createParticle();
 void freeParticle(struct particle *p);
 void freeElField(struct electricField *eF);
@@ -39,8 +44,17 @@ void setMagneticField(struct magneticField *mF, double *norm);
 void printDevInfo(struct particle *p);
 void printAttributes(struct particle *p);
 void move(struct particle *particle,double timeStep);
-void applyAcceleration(struct particle *p, struct electricField *eF, struct magneticField *mF);
-void checkCollision(struct particle *p1, struct particle *p2);
-void calcCollision(struct particle *p1, struct particle *p2);
-double *lennardJonesPotential(struct particle *p1, struct particle *p2);
+void applyFieldAcceleration(struct particle *p, struct electricField *eF, struct magneticField *mF);
+void applyInterAcceleration(struct particle *p1, struct particle *p2);
+double *electricForce(struct particle *p, struct electricField *eF);
+double *magneticForce(struct particle *p, struct magneticField *mF);
+double checkPrioriCollision(struct particle *p1, struct particle *p2);
+double evaluateCollision(double *sol);
+void calcCollision(struct particle *p1, struct particle *p2, double *direct);
+bool handleCollision(struct particle *p1, struct particle *p2);
+double *lennardJonesPotentialForce(struct particle *p1, struct particle *p2);
 double *electroStaticForce(struct particle *p1, struct particle *p2);
+double chargeToCoulombs(double charge);
+double nanoToMeter(double value);
+double uToKg(double weight);
+double meterToAngstrom(double distance);

@@ -1,5 +1,6 @@
 particleID: 2
 mass: 4
 charge: 0
-radius: 0.5
-epsilon: 2
+radius: 140
+epsilon: 10.2
+sigma: 2.55

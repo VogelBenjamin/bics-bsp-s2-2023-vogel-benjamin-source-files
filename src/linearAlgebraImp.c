@@ -1,7 +1,8 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<math.h>
-#include"linearAlgebra.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <math.h>
+#include "linearAlgebra.h"
 #include "omp.h"
 
 
@@ -13,6 +14,14 @@ int vectorSize = 3;
 double* createVector(){
   double* newVector = (double*)malloc(vectorSize*sizeof(newVector));
   return newVector;
+}
+
+void freeMatrix(double **matrix, int col){
+  for (int i = 0; i < col; ++i)
+  {
+    free(matrix[i]);
+  }
+  free(matrix);
 }
 
 /*
@@ -68,6 +77,13 @@ double norm(double* vector){
   double norm = 0;
   norm = sqrt(pow(vector[0],2) + pow(vector[1],2) + pow(vector[2],2));
   return norm;
+}
+
+double distance(double* pos1, double* pos2){
+  double* vec = connectPoints(pos1,pos2);
+  double distance = norm(vec);
+  free(vec);
+  return distance;
 }
 
 /*
@@ -126,6 +142,10 @@ void crossProduct(double *vector1, double *vector2, double* cP){
 */
 void normalize(double *vector){
   double vNorm = norm(vector);
+  if (vNorm == 0)
+  {
+    return;
+  }
   for (int i = 0; i < vectorSize; ++i)
   {
     vector[i] /= vNorm;
@@ -144,25 +164,83 @@ double angleBetween(double *v1, double * v2){
   assuming equation is linear
 */
 double *solveAugMatrix(double **augMatrix, int numEq, int numVar){
-  double ratio;
+  double ratio, sub;
   double *solution = (double*)malloc(sizeof(solution)*numVar);
-  // transform matrix into row echelon form
+  double temp;
+
+  // transform matrix into reduced row echelon form
+  // int i decides which column to operate on
   for (int i = 0; i < numVar; ++i)
   {
-    for (int j = i+1; j < numEq-i-1; ++j)
+    // makes sure that augementmatrix[i][i] is not 0
+    if (augMatrix[i][i] == 0)
     {
-      ratio = augMatrix[i][j]/augMatrix[i][i];
-      for (int k = 0; k < numVar+1; ++i)
+
+      for (int j = i+1; j < numEq; ++j)
       {
-        augMatrix[k][j] -= ratio*augMatrix[k][i];
+
+        if (augMatrix[i][j] != 0)
+        {
+
+          for (int k = 0; k < numVar+1; ++k)
+          {
+
+            temp = augMatrix[k][i];
+            augMatrix[k][i] = augMatrix[k][j];
+            augMatrix[k][j] = temp;
+          }
+
+          break;
+        }
       }
     }
+
+
+
+    if (augMatrix[i][i] != 0)
+    {
+      // makes sure there is a leading one within the row
+      ratio = 1.0/(augMatrix[i][i]);
+      for (int j = 0; j < numVar+1; ++j)
+      {
+        augMatrix[j][i] *= ratio;
+      }
+
+      // makes sure the values above and below the leading are turned to 0
+      // j indicates which row is operated on
+      for (int j = 0; j < numEq; ++j)
+      {
+        if (j != i)
+        {
+          sub = augMatrix[i][j];
+          // k indicates on which element of the row is operated on
+          for (int k = 0; k < numEq; ++k)
+          {
+            augMatrix[k][j] -= sub*augMatrix[k][i];
+          }
+        }
+      }
+    }
+
   }
 
-  for (int i = 0; i < numVar; ++i)
+  // determine what the solution is
+
+  if (!(abs(augMatrix[numVar][numEq-1]) < 1E-10))
   {
-    solution[i] = augMatrix[i][i];
+    // no solution -> return an array containing only NAN
+    for (int i = 0; i < numVar; ++i)
+    {
+      solution[i] = NAN;
+    }
+  } else {
+    // the solution is contained within the column containing the equantion constants
+    for (int i = 0; i < numVar; ++i)
+    {
+      solution[i] = augMatrix[numVar][i];
+    }
   }
 
   return solution;
 }
+

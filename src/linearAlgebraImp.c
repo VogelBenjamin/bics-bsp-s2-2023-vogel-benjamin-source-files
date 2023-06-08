@@ -135,8 +135,8 @@ void scalarMultiplication(double scalar, double *vector){
 double dotProduct(double *vector1, double *vector2){
   double dP = 0;
   int i;
-  #pragma omp parallel for private(i) shared(vectorSize) reduction(+: dP)
-    for (int i = 0; i < vectorSize; ++i)
+  #pragma omp parallel shared(vectorSize) private(i) reduction(+: dP)
+    for (int i; i < vectorSize; ++i)
     {
       dP += vector1[i]*vector2[i];
     }

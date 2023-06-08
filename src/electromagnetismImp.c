@@ -197,13 +197,13 @@ void printAttributes(struct particle *p){
   print position into a given file for csv usage
 */
 void printPos(struct particle *p, FILE *particleDoc, int ID){
-  char buffer[15];
+  char buffer[300];
   for (int i = 0; i < 2; ++i)
   {
-    snprintf(buffer, 15, "%lf, ", p->position[i]);
+    snprintf(buffer, 300, "%lf, ", p->position[i]);
     fputs(buffer,particleDoc);
   }
-  snprintf(buffer, 15, "%lf, %d\n", p->position[2], ID);
+  snprintf(buffer, 300, "%lf, %d\n", p->position[2], ID);
   fputs(buffer,particleDoc);
 }
 
@@ -266,7 +266,10 @@ void applyFieldAcceleration(struct particle *p, double *eF, double *mF){
 void applyInterAcceleration(struct particle *p1, struct particle **particleArray, int selfIdx, int particleArraySize){
   double force[3];
   double ljFo[3], elstFo[3];
-
+  if (particleArraySize == 1)
+  {
+    return;
+  }
   // apply electrostatic force
   if (p1->attributes->charge != 0)
   {
@@ -283,7 +286,7 @@ void applyInterAcceleration(struct particle *p1, struct particle **particleArray
 
     scalarMultiplication(-1/uToKg(p1->attributes->mass), elstFo);
 
-
+    // p1
     vectorAddition(p1->acceleration, elstFo);
 
 
@@ -298,7 +301,7 @@ void applyInterAcceleration(struct particle *p1, struct particle **particleArray
 
     scalarMultiplication(-1/uToKg(p1->attributes->mass), ljFo);
 
-    vectorAddition(p1->acceleration, ljFo);
+    vectorAddition(p1->acceleration, elstFo);
   }
 }
 
@@ -533,11 +536,10 @@ void lennardJonesPotentialForce(struct particle *p1, struct particle *p2, double
 
   // calculate potential
   lJForce = 48*epsilon*(pow(sigma,6)/pow(distance,6))*((pow(sigma,6)/pow(distance,7))-0.5*(pow(distance,-1)));
-  if (isnan(lJForce))
-  {
+
+  if (isnan(lJForce)){
     lJForce = 0;
   }
-
   // apply the intensity of the force to the direction unit vector to obtain the acctual force vector
   scalarMultiplication(lJForce,direct);
 

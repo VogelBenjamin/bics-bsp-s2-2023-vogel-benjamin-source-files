@@ -1,0 +1,47 @@
+Intel(R) VTune(TM) Amplifier summary
+Number of nodes;1
+
+/mnt/irisgpfs/apps/resif/iris-rhel8/2020b/broadwell/software/VTune/2020_update3/vtune_profiler_2020.3.0.612611/bin64/vtune -R summary -r /mnt/irisgpfs/users/bvogel/src/report_output/hwmetrics/results.iris-030,0.* -q -format csv -csv-delimiter semicolon
+Hierarchy Level;Metric Name;Metric Value
+0;Elapsed Time;65.114345
+1;SP GFLOPS;0.019374
+1;DP GFLOPS;0.373196
+1;x87 GFLOPS;0.002464
+1;IPC;
+1;Average CPU Frequency;0.0
+1;Total Thread Count;
+1;CPU Time;1523.299268
+0;Effective CPU Utilization;83.6
+1;Average Effective CPU Utilization;23.394 out of 28
+0;Memory Bound;
+1;Cache Bound;
+1;DRAM Bound;
+1;NUMA: % of Remote Accesses;31.4
+0;Vectorization;1.3
+1;Instruction Mix;
+2;SP FLOPs;0.0
+3;Packed;100.0
+4;128-bit;100.0
+4;256-bit;0.0
+3;Scalar;0.0
+2;DP FLOPs;1.1
+3;Packed;0.0
+4;128-bit;0.0
+4;256-bit;0.0
+3;Scalar;100.0
+2;x87 FLOPs;0.0
+2;Non-FP;98.9
+1;FP Arith/Mem Rd Instr. Ratio;0.023212
+1;FP Arith/Mem Wr Instr. Ratio;0.088127
+0;Collection and Platform Info;
+1;Application Command Line;./pH 
+1;Operating System;"4.18.0-372.32.1.el8_6.x86_64 NAME="Red Hat Enterprise Linux" VERSION="8.6 (Ootpa)" ID="rhel" ID_LIKE="fedora" VERSION_ID="8.6" PLATFORM_ID="platform:el8" PRETTY_NAME="Red Hat Enterprise Linux 8.6 (Ootpa)" ANSI_COLOR="0;31" CPE_NAME="cpe:/o:redhat:enterprise_linux:8::baseos" HOME_URL="https://www.redhat.com/" DOCUMENTATION_URL="https://access.redhat.com/documentation/red_hat_enterprise_linux/8/" BUG_REPORT_URL="https://bugzilla.redhat.com/"  REDHAT_BUGZILLA_PRODUCT="Red Hat Enterprise Linux 8" REDHAT_BUGZILLA_PRODUCT_VERSION=8.6 REDHAT_SUPPORT_PRODUCT="Red Hat Enterprise Linux" REDHAT_SUPPORT_PRODUCT_VERSION="8.6""
+1;Computer Name;iris-030
+1;Result Size;3096223
+1;Collection start time;21:09:40 18/05/2023 UTC
+1;Collection stop time;21:10:45 18/05/2023 UTC
+1;Collector Type;Driverless Perf per-process counting
+1;CPU;
+2;Name;Intel(R) Xeon(R) Processor code named Broadwell
+2;Frequency;2394454000
+2;Logical CPU Count;28

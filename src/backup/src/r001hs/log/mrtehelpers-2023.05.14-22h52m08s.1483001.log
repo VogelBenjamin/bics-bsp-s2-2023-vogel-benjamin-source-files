@@ -1,0 +1,7 @@
+93 [140737218426624] INFO mrtehelpers.mrteenv <> - Product libs directory: /mnt/irisgpfs/apps/resif/iris-rhel8/2020b/broadwell/software/VTune/2020_update3/vtune_profiler_2020.3.0.612611/lib64
+94 [140737218426624] INFO mrtehelpers.mrteenv <> - File mask: amplxe_tpssmrte_clrprof*
+178 [140737218426624] INFO mrtehelpers.mrteenv <> - File name: lib
+178 [140737218426624] INFO mrtehelpers.mrteenv <> - File mask: amplxe_tpssmrte_clrprof*
+188 [140737218426624] INFO mrtehelpers.mrteenv <> - File name: lib
+188 [140737218426624] ERROR mrtehelpers.mrteenv <> - Failed to init shared librarylib located at /mnt/irisgpfs/apps/resif/iris-rhel8/2020b/broadwell/software/VTune/2020_update3/vtune_profiler_2020.3.0.612611/lib64, at file: vcs/mrtehelpers3/src/mrteenv/mrte_profiling_initializer.cpp:485
+188 [140737218426624] ERROR mrtehelpers.mrteenv <> - CLR support is disabled because profiler GUID is empty, at file: vcs/mrtehelpers3/src/mrteenv/mrte_profiling_initializer.cpp:308

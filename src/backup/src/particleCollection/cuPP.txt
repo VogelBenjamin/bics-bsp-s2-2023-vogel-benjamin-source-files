@@ -1,0 +1,6 @@
+particleID: 5
+mass: 63.5
+charge: 2
+radius: 57
+epsilon: 119.8
+sigma: 3.4

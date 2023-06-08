@@ -1,0 +1,6 @@
+particleID: 4
+mass: 23
+charge: 1
+radius: 227
+epsilon: 227
+sigma: 0

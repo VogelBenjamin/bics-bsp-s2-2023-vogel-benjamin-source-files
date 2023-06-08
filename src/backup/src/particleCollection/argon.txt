@@ -1,0 +1,6 @@
+particleID: 3
+mass: 40
+charge: 0
+radius: 188
+epsilon: 119.8
+sigma: 3.4

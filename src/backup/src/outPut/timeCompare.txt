@@ -1,0 +1,9 @@
+./pH: error while loading shared libraries: libiomp5.so: cannot open shared object file: No such file or directory
+
+real	0m0.022s
+user	0m0.000s
+sys	0m0.001s
+
+real	162m29.075s
+user	323m57.927s
+sys	0m15.490s

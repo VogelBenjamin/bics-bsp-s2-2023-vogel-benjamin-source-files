@@ -3,4 +3,4 @@ mass: 1
 charge: 1
 radius: 120
 epsilon: 1
-sigma: NAN
+sigma: 0

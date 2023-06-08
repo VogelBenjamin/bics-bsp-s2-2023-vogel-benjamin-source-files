@@ -9,12 +9,14 @@
 #include "omp.h"
 
 void printDirectory();
+int **createPartition(int size);
 
 double currTimeStep;
 
 int main(int argc, char *argv[]){
 
   FILE *fp;
+  FILE *outPutp;
   char *ptr;
 
   int menuInput = 0;
@@ -27,8 +29,10 @@ int main(int argc, char *argv[]){
   double deltaY;
   double deltaZ;
 
-  char fileName[100];
-  char path[200] = "./particleCollection/";
+  char fileNameInput[100];
+  char pathInput[200] = "./particleCollection/";
+
+  char fileNameOutput[100];
 
   struct particle **particleArray;
   struct particle *tempParticle;
@@ -48,7 +52,7 @@ int main(int argc, char *argv[]){
   double spawnSphere[3];
   double spawnPoint[3];
 
-  if (!strcmp(argv[1], "-listParticles") && argc == 2)
+  if (argc == 2 && !strcmp(argv[1], "-listParticles"))
   {
 
     printDirectory();
@@ -60,35 +64,53 @@ int main(int argc, char *argv[]){
     return 0;
 
   }
-  else if (argc == 7)
+  else if (argc == 13 || argc == 14 || argc == 15)
   {
 
-    strcpy(fileName, argv[1]);
-    strcat(path,fileName);
+    strcpy(fileNameInput, argv[1]);
+    strcat(pathInput,fileNameInput);
     particleArraySize = atoi(argv[2]);
     timePeriod = atoi(argv[3]);
+
     velVec[0] = strtod(argv[4], &ptr);
+    velVec[1] = strtod(argv[5], &ptr);
+    velVec[2] = strtod(argv[6], &ptr);
+
+    elNorm[0] = strtod(argv[7], &ptr);
+    elNorm[1] = strtod(argv[8], &ptr);
+    elNorm[2] = strtod(argv[9], &ptr);
     for (int i = 0; i < 3; ++i)
     {
-
-      elNorm[i] = strtod(argv[5], &ptr);
-      spawnSphere[i] = atoi(argv[2]);
-
+      spawnSphere[i] = 200;
     }
-    magNorm[1] = strtod(argv[6], &ptr);
+    magNorm[0] = strtod(argv[10], &ptr);
+    magNorm[1] = strtod(argv[11], &ptr);
+    magNorm[2] = strtod(argv[12], &ptr);
     modifyVector(spawnPoint,spawnSphere);
   }
   else
   {
-    printf("%d\n", argc);
-    for (int i = 0; i < argc; ++i)
-    {
-      printf("%s\n",argv[i]);
-    }
     printf("Invalid Input!\n");
-    return 1;
-  }
+    strcat(pathInput,"proton.txt\0");
+    particleArraySize = 24;
+    timePeriod = 1;
 
+    velVec[0] = 1;
+    velVec[1] = 0;
+    velVec[2] = 1;
+
+    elNorm[0] = 0;
+    elNorm[1] = 1;
+    elNorm[2] = 0;
+    for (int i = 0; i < 3; ++i)
+    {
+      spawnSphere[i] = 0.5;
+    }
+    magNorm[0] = 1;
+    magNorm[1] = 0;
+    magNorm[2] = 1;
+    modifyVector(spawnPoint,spawnSphere);
+  }
   particleArray = (struct particle**)malloc(particleArraySize*sizeof(struct particle*));
 
   modifyVector(posVec, initialVec);
@@ -96,9 +118,7 @@ int main(int argc, char *argv[]){
 
   setElectricField(elFi, elNorm);
   setMagneticField(magFi,magNorm);
-
-  fp = fopen(path,"r");
-
+  fp = fopen(pathInput,"r");
   attr = getParticleAttributes(fp);
   fclose(fp);
 
@@ -121,92 +141,104 @@ int main(int argc, char *argv[]){
 
     setParticleInfo(tempParticle, spawnPoint, velVec, accVec, attr);
 
-    applyFieldAcceleration(tempParticle,elFi,magFi);
     particleArray[i] = tempParticle;
     modifyVector(spawnPoint,spawnSphere);
   }
 
   int *handled = (int*)malloc(particleArraySize*sizeof(handled));
+  double *elF = elFi->fieldVector;
+  double *magF = magFi->fieldVector;
+  int **particleIdxPartition = createPartition(particleArraySize);
+  int chunk = ((particleArraySize*(particleArraySize-1))/2);
+
   for (int i = 0; i < particleArraySize; ++i)
   {
     handled[i] = 0;
   }
 
-  //#pragma omp parallel shared(particleArraySize,particleArray,elFi,magFi,currTimeStep)
-    //#pragma omp for schedule(dynamic) private(i,j,k)
+  for (i = 0; i < timePeriod*(1/currTimeStep); ++i)
+  {
+    /*
+    if (i % 100000 == 0 && argc == 15)
+    {
+      printf("\n%lfs:\n",i*currTimeStep);
+    }
+  */
+    // apply the acceleration to all particles
 
-        for (i = 0; i < timePeriod*1000; ++i)
+    #pragma omp parallel shared(particleArraySize,particleArray,elF,magF, particleIdxPartition, chunk, i)
+      #pragma omp for schedule(static,1) private(j,k)
+        for (j = 0; j < particleArraySize; ++j)
         {
-          if (i % 100 == 0)
+          applyFieldAcceleration(particleArray[j],elF,magF);
+          int id = omp_get_thread_num();
+          int total = omp_get_num_threads();
+          int *ptr;
+          //printf("id: %d, total: %d, chunk: %d, part: %d\n", id, total, chunk,chunk/total );
+
+	        applyInterAcceleration(particleArray[j],particleArray,j,particleArraySize);
+
+          for (k = chunk*id/total; k < chunk*(id+1)/total; ++k)
           {
-            printf("\n%lfs:\n",i*0.001);
-          }
-          // apply the acceleration to all particles
-          for (j = 0; j < particleArraySize; ++j)
-          {
-            applyFieldAcceleration(particleArray[j],elFi,magFi);
-          }
-
-          // apply interaction forces
-          for (j = 0; j < particleArraySize; ++j)
-          {
-
-              // checks all the remaining possible collisions and performs particle displacement
-              for (k = j+1; k < particleArraySize; ++k)
-              {
-                applyInterAcceleration(particleArray[j],particleArray[k]);
-              }
-          }
-
-          // check collisions and move the particles
-          for (j = 0; j < particleArraySize; ++j)
-          {
-
-              // checks all the remaining possible collisions and performs particle displacement
-              for (k = j+1; k < particleArraySize; ++k)
-              {
-
-                if (handleCollision(particleArray[j],particleArray[k]))
-                {
-                  handled[j] = 1;
-                  handled[k] = 1;
-                  break;
-                }
-
-              }
-
-              // check whether the movement of a particle has already been computed
-              if (handled[j] == 0)
-              {
-                move(particleArray[j],currTimeStep);
-              }
-
-
-
-            if (i % 100 == 0)
+            ptr = particleIdxPartition[k];
+            if (ptr && handled[j] == 0 && handleCollision(particleArray[ptr[0]],particleArray[ptr[1]],ptr[0],handled))
             {
-              printAttributes(particleArray[j]);
+              handled[j] = 1;
+	            handled[k-chunk*id/total] = 1;
             }
           }
 
+          // check whether the movement of a particle has already been computed
+          if (handled[j] == 0)
+          {
+            move(particleArray[j],currTimeStep);
+          }
+          handled[j] = 0;
         }
 
+    if (i % 100000 == 0 && argc == 15)
+    {
+      if (argc == 15)
+      {
+        snprintf(fileNameOutput, 100, "./visualData/%s.csv.%d", argv[14], i/100000);
+      } else {
+        snprintf(fileNameOutput, 100, "./visualData/timeStep.csv.%d", i/100000);
+      }
 
+      outPutp = fopen(fileNameOutput, "w");
+      fputs("x coord, y coord, z coord, scalar\n", outPutp);
+      for (j = 0; j < particleArraySize; ++j)
+      {
+        printAttributes(particleArray[j]);
+        printPos(particleArray[j], outPutp, j);
+      }
+      fclose(outPutp);
+    }
 
+    for (j = 0; j < particleArraySize; ++j)
+    {
+      scalarMultiplication(0,particleArray[j]->acceleration);
+    }
+
+  }
 
   freeArrayOfParticles(particleArray,particleArraySize);
-
+  free(handled);
   free(posVec);
   free(velVec);
   free(accVec);
   free(attr);
+  for (int i = 0; i < chunk; ++i)
+  {
+    free(particleIdxPartition[i]);
+  }
+  free(particleIdxPartition);
 
   freeElField(elFi);
   freeMagField(magFi);
-  
+
   return 0;
 }
-
 void printDirectory(){
   FILE *fp;
   DIR *folder;
@@ -242,8 +274,74 @@ void printDirectory(){
   closedir(folder);
 }
 
+int **createPartition(int size){
+  int partitionSize = (size*(size-1))/2;
+
+  if (partitionSize % omp_get_max_threads() != 0){
+    partitionSize += omp_get_max_threads() - (partitionSize % omp_get_max_threads());
+  }
+
+  int counter = 0;
+  int **partition = (int**)malloc(sizeof(int*)*partitionSize);
+  int *pair;
+  for (int i = 0; i < size; ++i)
+  {
+    for (int j = i+1; j < size; ++j)
+    {
+      pair = (int*)malloc(sizeof(int)*2);
+      pair[0] = i;
+      pair[1] = j;
+      partition[counter] = pair;
+      counter++;
+    }
+  }
+
+
+  for (int i = counter; i < partitionSize; ++i)
+  {
+    partition[i] = NULL;
+  }
+  return partition;
+}
 
 
 
 
+#pragma omp parallel
+#pragma omp for
+for (int i = 0; i < size; i++)
+{
+  for (int j = i+1; j < size; j++)
+  {
+    // acceleration is applied to both particles
+    calculateAcceleration(particles[i], particles[j]);
+  }
+}
+
+#pragma omp parallel
+#pragma omp for
+for (int i = 0; i < size; i++)
+{
+  for (int j = 0; j < size; j++)
+  {
+    // acceleration is applied to only particles[i]
+    calculateAcceleration(particles[i], particles[j]);
+  }
+}
+
+
+#pragma omp parallel
+#pragma omp for
+for (int i = 0; i < count; ++i)
+{
+  int id = omp_get_thread_num();
+  int total = omp_get_num_threads();
+  int ptr*;
+
+  for (int j = chunk*id/total ; j < chunk*(id+1)/total; ++j)
+  {
+    // acceleration is applied to both particles
+    calculateAcceleration(particles[i], particles[j]);
+  }
+}
 

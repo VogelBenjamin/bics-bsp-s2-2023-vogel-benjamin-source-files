@@ -53,7 +53,8 @@ void setVector(double *vector){
 void modifyVector(double *oldVector, double *newVector){
   for (int i = 0; i < vectorSize; ++i)
   {
-    oldVector[i] = newVector[i];
+    #pragma omp atomic read
+      oldVector[i] = newVector[i];
   }
 }
 
@@ -75,7 +76,7 @@ void printVector(double *vector){
 */
 double norm(double* vector){
   double norm = 0;
-  norm = sqrt(pow(vector[0],2) + pow(vector[1],2) + pow(vector[2],2));
+  norm = sqrt(vector[0]*vector[0] + vector[1]*vector[1] + vector[2]*vector[2]);
   return norm;
 }
 
@@ -97,6 +98,17 @@ void vectorAddition(double *vector1, double *vector2){
 }
 
 /*
+  adds vector2 to vector1
+*/
+void vectorAtomicAddition(double *vector1, double *vector2){
+  for (int i = 0; i < vectorSize; ++i)
+  {
+    #pragma omp atomic
+      vector1[i] += vector2[i];
+  }
+}
+
+/*
   subtracts vector2 from vector 1
 */
 void vectorSubtraction(double *vector1, double *vector2){
@@ -110,7 +122,8 @@ void vectorSubtraction(double *vector1, double *vector2){
   multiplies each element of a given vector by a scalar value
 */
 void scalarMultiplication(double scalar, double *vector){
-  for (int i = 0; i < vectorSize; ++i)
+  int i;
+  for (i = 0; i < vectorSize; ++i)
   {
     vector[i] *= scalar;
   }
@@ -121,10 +134,12 @@ void scalarMultiplication(double scalar, double *vector){
 */
 double dotProduct(double *vector1, double *vector2){
   double dP = 0;
-  for (int i = 0; i < vectorSize; ++i)
-  {
-    dP += vector1[i]*vector2[i];
-  }
+  int i;
+  #pragma omp parallel for private(i) shared(vectorSize) reduction(+: dP)
+    for (int i = 0; i < vectorSize; ++i)
+    {
+      dP += vector1[i]*vector2[i];
+    }
   return dP;
 }
 
@@ -167,22 +182,22 @@ double *solveAugMatrix(double **augMatrix, int numEq, int numVar){
   double ratio, sub;
   double *solution = (double*)malloc(sizeof(solution)*numVar);
   double temp;
-
+  int i,j,k;
   // transform matrix into reduced row echelon form
   // int i decides which column to operate on
-  for (int i = 0; i < numVar; ++i)
+  for (i = 0; i < numVar; ++i)
   {
     // makes sure that augementmatrix[i][i] is not 0
     if (augMatrix[i][i] == 0)
     {
 
-      for (int j = i+1; j < numEq; ++j)
+      for (j = i+1; j < numEq; ++j)
       {
 
         if (augMatrix[i][j] != 0)
         {
 
-          for (int k = 0; k < numVar+1; ++k)
+          for (k = 0; k < numVar+1; ++k)
           {
 
             temp = augMatrix[k][i];
@@ -201,20 +216,20 @@ double *solveAugMatrix(double **augMatrix, int numEq, int numVar){
     {
       // makes sure there is a leading one within the row
       ratio = 1.0/(augMatrix[i][i]);
-      for (int j = 0; j < numVar+1; ++j)
+      for (j = 0; j < numVar+1; ++j)
       {
         augMatrix[j][i] *= ratio;
       }
 
       // makes sure the values above and below the leading are turned to 0
       // j indicates which row is operated on
-      for (int j = 0; j < numEq; ++j)
+      for (j = 0; j < numEq; ++j)
       {
         if (j != i)
         {
           sub = augMatrix[i][j];
           // k indicates on which element of the row is operated on
-          for (int k = 0; k < numEq; ++k)
+          for (k = 0; k < numEq; ++k)
           {
             augMatrix[k][j] -= sub*augMatrix[k][i];
           }
